@@ -2,7 +2,7 @@ import * as h3 from 'h3-js';
 import * as turf from '@turf/turf';
 import type { LatLng, PickupPoint, CorridorStats } from '../types';
 import { CORRIDOR_RADIUS_METERS, H3_RESOLUTION } from '../data/sampleData';
-import type { Feature, Polygon, MultiPolygon } from '@turf/turf';
+import type { Feature, Polygon, MultiPolygon } from 'geojson';
 
 /**
  * Build a Turf LineString from route points
@@ -14,16 +14,16 @@ export function routeToLineString(route: LatLng[]) {
 /**
  * Create a 350m buffer polygon around the route using Turf
  */
-export function buildCorridorPolygon(route: LatLng[]): turf.Feature<Polygon | MultiPolygon> | null {
+export function buildCorridorPolygon(route: LatLng[]): Feature<Polygon | MultiPolygon> | null {
   if (route.length < 2) return null;
   const line = routeToLineString(route);
-  return turf.buffer(line, CORRIDOR_RADIUS_METERS / 1000, { units: 'kilometers', steps: 16 }) as turf.Feature<Polygon | MultiPolygon>;
+  return turf.buffer(line, CORRIDOR_RADIUS_METERS / 1000, { units: 'kilometers', steps: 16 }) as Feature<Polygon | MultiPolygon>;
 }
 
 /**
  * Get all H3 cells covering the corridor polygon at the given resolution
  */
-export function getCorridorH3Cells(corridorGeoJson: turf.Feature<Polygon | MultiPolygon>): Set<string> {
+export function getCorridorH3Cells(corridorGeoJson: Feature<Polygon | MultiPolygon>): Set<string> {
   const cells = new Set<string>();
   const geom = corridorGeoJson.geometry;
 
@@ -94,7 +94,7 @@ export function calcRouteLength(route: LatLng[]): number {
 /**
  * Corridor area in km²
  */
-export function calcCorridorArea(corridorGeoJson: turf.Feature<Polygon | MultiPolygon> | null): number {
+export function calcCorridorArea(corridorGeoJson: Feature<Polygon | MultiPolygon> | null): number {
   if (!corridorGeoJson) return 0;
   return turf.area(corridorGeoJson) / 1_000_000; // m² → km²
 }
@@ -103,7 +103,7 @@ export function calcCorridorArea(corridorGeoJson: turf.Feature<Polygon | MultiPo
  * Convert corridor GeoJSON to Leaflet-compatible LatLng arrays
  */
 export function corridorToLeafletCoords(
-  corridorGeoJson: turf.Feature<Polygon | MultiPolygon>
+  corridorGeoJson: Feature<Polygon | MultiPolygon>
 ): any[] {
   const geom = corridorGeoJson.geometry;
   const polys = geom.type === 'MultiPolygon'
@@ -123,7 +123,7 @@ export function corridorToLeafletCoords(
  */
 export function buildStats(
   pickups: PickupPoint[],
-  corridorGeoJson: turf.Feature<Polygon | Polygon | MultiPolygon> | null,
+  corridorGeoJson: Feature<Polygon | MultiPolygon> | null,
   fullRoute: LatLng[],
   traveledRoute: LatLng[]
 ): CorridorStats {
