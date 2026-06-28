@@ -2,7 +2,7 @@ import * as h3 from 'h3-js';
 import * as turf from '@turf/turf';
 import type { LatLng, PickupPoint, CorridorStats } from '../types';
 import { CORRIDOR_RADIUS_METERS, H3_RESOLUTION } from '../data/sampleData';
-
+import type { Feature, Polygon, MultiPolygon } from '@turf/turf';
 /**
  * Build a Turf LineString from route points
  */
