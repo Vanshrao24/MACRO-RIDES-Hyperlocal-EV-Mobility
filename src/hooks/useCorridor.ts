@@ -9,8 +9,9 @@ import {
   buildStats,
 } from '../utils/geo';
 import { PICKUP_POINTS } from '../data/sampleData';
-import * as turf from '@turf/turf';
 
+import type { Feature, Polygon, MultiPolygon } from '@turf/turf';
+import { buffer } from '@turf/turf'; 
 export function useCorridor(traveledRoute: LatLng[], fullRoute: LatLng[]) {
   const corridorGeoJson = useMemo(() => {
     if (traveledRoute.length < 2) return null;
