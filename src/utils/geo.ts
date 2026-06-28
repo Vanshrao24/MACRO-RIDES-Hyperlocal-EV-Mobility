@@ -3,6 +3,7 @@ import * as turf from '@turf/turf';
 import type { LatLng, PickupPoint, CorridorStats } from '../types';
 import { CORRIDOR_RADIUS_METERS, H3_RESOLUTION } from '../data/sampleData';
 import type { Feature, Polygon, MultiPolygon } from '@turf/turf';
+
 /**
  * Build a Turf LineString from route points
  */
@@ -13,16 +14,16 @@ export function routeToLineString(route: LatLng[]) {
 /**
  * Create a 350m buffer polygon around the route using Turf
  */
-export function buildCorridorPolygon(route: LatLng[]) {
+export function buildCorridorPolygon(route: LatLng[]): turf.Feature<Polygon | MultiPolygon> | null {
   if (route.length < 2) return null;
   const line = routeToLineString(route);
-  return turf.buffer(line, CORRIDOR_RADIUS_METERS / 1000, { units: 'kilometers', steps: 16 });
+  return turf.buffer(line, CORRIDOR_RADIUS_METERS / 1000, { units: 'kilometers', steps: 16 }) as turf.Feature<Polygon | MultiPolygon>;
 }
 
 /**
  * Get all H3 cells covering the corridor polygon at the given resolution
  */
-export function getCorridorH3Cells(corridorGeoJson: turf.Feature<turf.Polygon | turf.MultiPolygon>): Set<string> {
+export function getCorridorH3Cells(corridorGeoJson: turf.Feature<Polygon | MultiPolygon>): Set<string> {
   const cells = new Set<string>();
   const geom = corridorGeoJson.geometry;
 
@@ -32,13 +33,13 @@ export function getCorridorH3Cells(corridorGeoJson: turf.Feature<turf.Polygon | 
 
   for (const poly of polys) {
     try {
-      const filled = h3.polygonToCells(
-        {
-          outer: poly[0].map(([lng, lat]) => [lat, lng] as [number, number]),
-          holes: poly.slice(1).map(hole => hole.map(([lng, lat]) => [lat, lng] as [number, number])),
-        },
-        H3_RESOLUTION
+      // GeoJSON [lng, lat] ko H3 ke required [lat, lng] format mein convert kar rahe hain
+      const h3Polygon = poly.map((ring: any) => 
+        ring.map(([lng, lat]: [number, number]) => [lat, lng] as [number, number])
       );
+      
+      // H3 cells calculate karna
+      const filled = h3.polygonToCells(h3Polygon, H3_RESOLUTION);
       filled.forEach(c => cells.add(c));
     } catch {
       // skip malformed polygons
@@ -93,7 +94,7 @@ export function calcRouteLength(route: LatLng[]): number {
 /**
  * Corridor area in km²
  */
-export function calcCorridorArea(corridorGeoJson: turf.Feature<turf.Polygon | turf.MultiPolygon> | null): number {
+export function calcCorridorArea(corridorGeoJson: turf.Feature<Polygon | MultiPolygon> | null): number {
   if (!corridorGeoJson) return 0;
   return turf.area(corridorGeoJson) / 1_000_000; // m² → km²
 }
@@ -102,15 +103,18 @@ export function calcCorridorArea(corridorGeoJson: turf.Feature<turf.Polygon | tu
  * Convert corridor GeoJSON to Leaflet-compatible LatLng arrays
  */
 export function corridorToLeafletCoords(
-  corridorGeoJson: turf.Feature<turf.Polygon | turf.MultiPolygon>
-): LatLng[][] {
+  corridorGeoJson: turf.Feature<Polygon | MultiPolygon>
+): any[] {
   const geom = corridorGeoJson.geometry;
   const polys = geom.type === 'MultiPolygon'
     ? geom.coordinates
     : [geom.coordinates];
 
-  return polys.map(poly =>
-    poly[0].map(([lng, lat]) => ({ lat, lng }))
+  // Leaflet ke liye [lat, lng] format return karega bina syntax error ke
+  return polys.map((poly: any) =>
+    poly.map((ring: any) =>
+      ring.map(([lng, lat]: [number, number]) => [lat, lng])
+    )
   );
 }
 
@@ -119,7 +123,7 @@ export function corridorToLeafletCoords(
  */
 export function buildStats(
   pickups: PickupPoint[],
-  corridorGeoJson: turf.Feature<turf.Polygon | turf.MultiPolygon> | null,
+  corridorGeoJson: turf.Feature<Polygon | Polygon | MultiPolygon> | null,
   fullRoute: LatLng[],
   traveledRoute: LatLng[]
 ): CorridorStats {
