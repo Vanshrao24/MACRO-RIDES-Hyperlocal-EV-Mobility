@@ -1,16 +1,16 @@
-# 🛵 Macro Rides — Zone Boundary & Dynamic Route Corridor Visualizer
+#  Macro Rides — Zone Boundary & Dynamic Route Corridor Visualizer
 
 A production-quality web application built for the Macro Rides Technical Evaluation Assignment. It visualizes a live driver route, draws a **350m buffer corridor** using Turf.js, indexes pickup points with **H3 (Res-9)**, and highlights eligible pickups in real time as the driver moves.
 
 ---
 
-## 🎥 Live Demo
+##  Live Demo
 
 Open **`index-standalone.html`** directly in any modern browser — no build step required.
 
 ---
 
-## ✨ Features
+##  Features
 
 | Feature | Implementation |
 |---|---|
@@ -27,7 +27,7 @@ Open **`index-standalone.html`** directly in any modern browser — no build ste
 
 ---
 
-## 🗺️ How It Works
+##  How It Works
 
 ```
 Driver moves along route
@@ -51,7 +51,7 @@ At Res-9, each hexagon has an edge length of ~174m and area of ~0.105 km². This
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 macro-rides/
@@ -81,7 +81,7 @@ macro-rides/
 
 ---
 
-## 🚀 Running the React App
+##  Running the React App
 
 ```bash
 # Install dependencies
@@ -110,7 +110,7 @@ npm run preview
 
 ---
 
-## 🌐 Deployment
+##  Deployment
 
 ### Vercel (recommended)
 ```bash
@@ -135,17 +135,17 @@ Upload `index-standalone.html` to any static host. It loads all dependencies fro
 
 ---
 
-## 🗺️ Sample Data
+##  Sample Data
 
 The demo simulates a real Bengaluru route:
 
 **Route:** Koramangala 5th Block → Indiranagar 12th Main (~3.8 km)
 
 **20 pickup points** across 4 types:
-- 🚇 Metro stations (Indiranagar Metro, JP Nagar Metro)
-- 🚌 Bus stops (Sony World Signal, Domlur Flyover, etc.)
-- 📍 Landmarks (Forum Mall, Embassy Golf Links)
-- 🏠 Residential gates (HSR Sector 1, Domlur Layout)
+-  Metro stations (Indiranagar Metro, JP Nagar Metro)
+-  Bus stops (Sony World Signal, Domlur Flyover, etc.)
+-  Landmarks (Forum Mall, Embassy Golf Links)
+-  Residential gates (HSR Sector 1, Domlur Layout)
 
 **4 zone polygons:**
 - Koramangala Ops Zone (operational)
@@ -155,24 +155,13 @@ The demo simulates a real Bengaluru route:
 
 ---
 
-## 🏗️ Architecture Notes
+##  Architecture Notes
 
 - **Spatial indexing**: H3 Res-9 cells are re-computed on each tick using `polygonToCells`. A `Set` lookup makes eligibility O(1) per pickup.
 - **Buffer accuracy**: Turf uses geodesic calculations — the 350m radius is accurate in meters, not degrees.
 - **Performance**: `useMemo` (React build) / lazy recalculation ensures the corridor polygon is only rebuilt when the route changes, not on every render.
 - **Scalability**: The architecture supports swapping real-time GPS via WebSocket — replace the simulation interval with a WS message handler calling the same `update()` function.
 
----
 
-## 📧 Submission
 
-Email to: **careers@macrorides.com**
 
-Include:
-- GitHub repository link
-- Deployment link (or attach `index-standalone.html`)
-- This README as documentation
-
----
-
-*Built with ❤️ for Macro Rides · Hyperlocal EV Mobility*
