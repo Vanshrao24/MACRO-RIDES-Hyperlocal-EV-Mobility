@@ -2,70 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Macro Rides — Zone Corridor Visualizer</title>
-<meta name="description" content="Hyperlocal EV mobility route corridor visualizer using H3 geospatial indexing and Turf.js buffering" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛵</text></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/h3-js/4.1.0/h3-js.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
 <style>
-/* ============================================================
-   RESET & BASE
-   ============================================================ */
+/* ============ RESET & BASE ============ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  --font: 'Inter', system-ui, -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', 'Consolas', monospace;
-  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 18px;
-  --tx: 0.18s cubic-bezier(.4,0,.2,1);
-  --tx-slow: 0.35s cubic-bezier(.4,0,.2,1);
-  --sidebar-w: 304px;
-  --focus-ring: 0 0 0 3px;
+  --font: 'Inter', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+  --tx: 0.18s ease;
 }
 html, body { height: 100%; font-family: var(--font); -webkit-font-smoothing: antialiased; }
 body { overflow: hidden; }
 button { font-family: var(--font); cursor: pointer; border: none; background: none; }
-button:disabled { cursor: not-allowed; opacity: 0.5; }
-img, svg { display: block; }
-
-/* Accessible focus states */
-:focus-visible {
-  outline: 2px solid var(--acc);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-button:focus-visible, .p-item:focus-visible, [tabindex]:focus-visible {
-  box-shadow: var(--focus-ring) var(--acc);
-  outline: none;
-}
-
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-/* ============================================================
-   THEMES
-   ============================================================ */
+/* ============ THEMES ============ */
 body.dark {
   --bg: #0a0f1a; --srf: #111827; --srf2: #1a2235; --srf3: #1f2d44;
   --hov: #243047; --bdr: rgba(255,255,255,0.07); --bdr-a: rgba(56,189,248,0.35);
   --txt: #f0f6ff; --txt2: #94a3b8; --txt3: #4b5563;
   --acc: #38bdf8; --grn: #34d399; --pur: #a78bfa; --red: #f87171;
   --sh: 0 2px 20px rgba(0,0,0,.5); --sh-lg: 0 8px 40px rgba(0,0,0,.6);
-  --pickup-inactive: #4b5563;
-  --pickup-inactive-ring: #374151;
-  --ghost-route: #334155;
-  --skel: #1a2235;
   color-scheme: dark;
 }
 body.light {
@@ -74,133 +38,71 @@ body.light {
   --txt: #0f172a; --txt2: #475569; --txt3: #94a3b8;
   --acc: #0284c7; --grn: #059669; --pur: #7c3aed; --red: #dc2626;
   --sh: 0 2px 12px rgba(0,0,0,.1); --sh-lg: 0 8px 32px rgba(0,0,0,.14);
-  --pickup-inactive: #9ca3af;
-  --pickup-inactive-ring: #d1d5db;
-  --ghost-route: #cbd5e1;
-  --skel: #e2e8f0;
   color-scheme: light;
 }
-body {
-  background: var(--bg);
-  color: var(--txt);
-  transition: background var(--tx-slow), color var(--tx-slow);
-}
-
-/* ============================================================
-   LOADING SCREEN
-   ============================================================ */
-#loading-screen {
-  position: fixed; inset: 0; z-index: 9999;
-  background: var(--bg);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 16px;
-  transition: opacity .5s ease, visibility .5s ease;
-}
-#loading-screen.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
-.loader-icon { font-size: 40px; animation: loaderBounce 1.1s ease-in-out infinite; }
-@keyframes loaderBounce {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-10px) scale(1.05); }
-}
-.loader-text { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--txt3); font-weight: 600; }
-.loader-bar { width: 160px; height: 3px; background: var(--srf3); border-radius: 99px; overflow: hidden; }
-.loader-bar-fill {
-  height: 100%; width: 40%; border-radius: 99px;
-  background: linear-gradient(90deg, var(--acc), var(--grn));
-  animation: loaderSlide 1.2s ease-in-out infinite;
-}
-@keyframes loaderSlide {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(350%); }
-}
-
-/* ============================================================
-   LAYOUT
-   ============================================================ */
-#app { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
+body { background: var(--bg); color: var(--txt); }
+/* ============ LAYOUT ============ */
+#app { display: flex; height: 100vh; overflow: hidden; }
 #sidebar {
-  width: var(--sidebar-w); min-width: var(--sidebar-w); background: var(--srf);
+  width: 304px; min-width: 304px; background: var(--srf);
   border-right: 1px solid var(--bdr); display: flex; flex-direction: column;
   overflow: hidden; box-shadow: var(--sh); z-index: 10;
-  transition: transform var(--tx-slow), width var(--tx-slow), min-width var(--tx-slow);
+  transition: transform .3s ease;
 }
-#sidebar.collapsed { transform: translateX(-100%); position: absolute; height: 100%; }
-#map-area { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; min-width: 0; }
-#map { flex: 1; outline: none; }
+#sidebar.collapsed { transform: translateX(-304px); position: absolute; }
+#map-area { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+#map { flex: 1; }
 #map-foot {
   position: absolute; bottom: 0; left: 0; right: 0; z-index: 20; pointer-events: none;
   background: var(--srf); border-top: 1px solid var(--bdr);
   padding: 5px 16px; font-size: 11px; color: var(--txt3); font-family: var(--mono);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-
-/* ============================================================
-   SIDEBAR HEADER
-   ============================================================ */
+/* ============ SIDEBAR HEADER ============ */
 #sidebar-header {
   padding: 16px; border-bottom: 1px solid var(--bdr); background: var(--srf2); flex-shrink: 0;
 }
 .logo-row { display: flex; align-items: center; gap: 10px; }
-.logo-icon { font-size: 28px; line-height: 1; }
+.logo-icon { font-size: 28px; }
 .logo-brand { font-size: 14px; font-weight: 700; letter-spacing: .12em; color: var(--acc); }
 .logo-sub { font-size: 10px; color: var(--txt3); letter-spacing: .06em; margin-top: 1px; text-transform: uppercase; }
-
-/* ============================================================
-   SIDEBAR SECTIONS
-   ============================================================ */
+/* ============ SIDEBAR SECTIONS ============ */
 .s-sect { padding: 13px 14px; border-bottom: 1px solid var(--bdr); flex-shrink: 0; }
 .s-sect.grow { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
 .s-title {
   font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
   color: var(--txt3); margin-bottom: 9px; display: flex; align-items: center; gap: 6px;
 }
-
-/* ============================================================
-   PROGRESS
-   ============================================================ */
+/* ============ PROGRESS ============ */
 .prog-track { height: 6px; border-radius: 99px; background: var(--srf3); overflow: hidden; }
-.prog-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--acc), var(--grn)); transition: width .4s cubic-bezier(.4,0,.2,1); }
+.prog-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--acc), var(--grn)); transition: width .6s cubic-bezier(.4,0,.2,1); }
 .prog-label { font-size: 11px; color: var(--txt2); margin-top: 6px; font-variant-numeric: tabular-nums; }
-
-/* ============================================================
-   STATS GRID
-   ============================================================ */
+/* ============ STATS GRID ============ */
 .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.stat-card {
-  background: var(--srf2); border: 1px solid var(--bdr); border-radius: var(--r-md); padding: 10px 11px;
-  transition: background var(--tx), border-color var(--tx), transform var(--tx);
-}
-.stat-card:hover { border-color: var(--bdr-a); }
-.stat-val { font-size: 22px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; transition: color var(--tx); }
+.stat-card { background: var(--srf2); border: 1px solid var(--bdr); border-radius: var(--r-md); padding: 10px 11px; }
+.stat-val { font-size: 22px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .stat-unit { font-size: 13px; font-weight: 500; margin-left: 1px; opacity: .7; }
 .stat-lbl { font-size: 10px; color: var(--txt3); margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
-
-/* ============================================================
-   LEGEND
-   ============================================================ */
+/* ============ LEGEND ============ */
 .legend { display: flex; flex-direction: column; gap: 7px; }
 .leg-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--txt2); }
 .leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .leg-line { width: 18px; height: 3px; border-radius: 2px; background: var(--acc); flex-shrink: 0; }
+.leg-dash { width: 18px; height: 0; border-bottom: 2px dashed var(--acc); opacity: .5; flex-shrink: 0; }
 .leg-sep { height: 4px; }
-
-/* ============================================================
-   PICKUP LIST
-   ============================================================ */
-.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; border-radius: 99px; font-size: 10px; font-weight: 700; padding: 0 5px; transition: background var(--tx), color var(--tx); }
+/* ============ PICKUP LIST ============ */
+.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; border-radius: 99px; font-size: 10px; font-weight: 700; padding: 0 5px; }
 .badge-g { background: rgba(52,211,153,.15); color: var(--grn); }
-#pickup-list { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; flex: 1; padding-right: 2px; scroll-behavior: smooth; }
+#pickup-list { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; flex: 1; padding-right: 2px; }
 #pickup-list::-webkit-scrollbar { width: 4px; }
 #pickup-list::-webkit-scrollbar-thumb { background: var(--bdr); border-radius: 99px; }
 .p-item {
   display: flex; align-items: center; gap: 9px; padding: 8px 9px; border-radius: var(--r-sm);
   background: var(--srf2); border: 1px solid var(--bdr); cursor: pointer;
-  transition: background var(--tx), border-color var(--tx), box-shadow var(--tx);
+  transition: background var(--tx), border-color var(--tx);
 }
 .p-item:hover { background: var(--hov); border-color: var(--bdr-a); }
 .p-item.sel { background: var(--srf3); border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc); }
-.p-ico { flex-shrink: 0; width: 16px; height: 16px; color: var(--txt2); }
-.p-item.sel .p-ico, .p-item:hover .p-ico { color: var(--acc); }
+.p-ico { font-size: 15px; flex-shrink: 0; }
 .p-info { flex: 1; min-width: 0; }
 .p-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .p-meta { font-size: 10px; color: var(--txt3); margin-top: 2px; display: flex; gap: 5px; align-items: center; }
@@ -209,30 +111,24 @@ body {
 .r-cnt { font-size: 16px; font-weight: 700; color: var(--pur); line-height: 1; font-variant-numeric: tabular-nums; }
 .r-lbl { font-size: 9px; color: var(--txt3); text-transform: uppercase; letter-spacing: .06em; }
 .empty-msg { font-size: 12px; color: var(--txt3); text-align: center; padding: 20px 0; font-style: italic; }
-
-/* ============================================================
-   CONTROLS BAR
-   ============================================================ */
+/* ============ CONTROLS BAR ============ */
 #ctrl-bar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 8px 14px; background: var(--srf); border-bottom: 1px solid var(--bdr);
   gap: 10px; flex-shrink: 0; z-index: 20; box-shadow: var(--sh);
-  flex-wrap: wrap;
 }
-.ctrl-left, .ctrl-right { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ctrl-left, .ctrl-right { display: flex; align-items: center; gap: 7px; }
 .c-btn {
   display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px;
   border: 1px solid var(--bdr); border-radius: var(--r-sm); background: var(--srf2);
   color: var(--txt2); font-size: 12px; font-weight: 500; white-space: nowrap;
-  transition: background var(--tx), border-color var(--tx), color var(--tx), transform .12s ease;
+  transition: background var(--tx), border-color var(--tx), color var(--tx);
 }
 .c-btn:hover { background: var(--hov); color: var(--txt); border-color: var(--bdr-a); }
-.c-btn:active { transform: scale(0.96); }
 .c-btn.primary { background: var(--acc); color: #fff; border-color: transparent; font-weight: 600; }
 .c-btn.primary:hover { opacity: .88; }
 .c-btn.icon-only { padding: 6px 9px; }
-.c-btn svg { flex-shrink: 0; }
-.done-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--grn); padding: 6px 12px; background: rgba(52,211,153,.1); border-radius: var(--r-sm); border: 1px solid rgba(52,211,153,.2); }
+.done-badge { font-size: 12px; font-weight: 600; color: var(--grn); padding: 6px 12px; background: rgba(52,211,153,.1); border-radius: var(--r-sm); border: 1px solid rgba(52,211,153,.2); }
 .dvdr { width: 1px; height: 22px; background: var(--bdr); }
 .speed-wrap { display: flex; align-items: center; gap: 4px; }
 .spd-lbl { font-size: 11px; color: var(--txt3); margin-right: 2px; text-transform: uppercase; letter-spacing: .06em; }
@@ -243,83 +139,31 @@ body {
 .chip-acc { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 35%, transparent); background: color-mix(in srgb, var(--acc) 10%, transparent); }
 .chip-pur { color: var(--pur); border-color: color-mix(in srgb, var(--pur) 35%, transparent); background: color-mix(in srgb, var(--pur) 10%, transparent); }
 .drv-spd { display: flex; align-items: center; gap: 4px; font-size: 12px; font-family: var(--mono); color: var(--grn); font-weight: 500; }
-.drv-spd svg { color: var(--grn); }
-
-/* ============================================================
-   MOBILE SIDEBAR TOGGLE (floating, shown only when collapsed on small screens)
-   ============================================================ */
-#mobile-sidebar-toggle {
+/* ============ TOGGLE SIDEBAR BTN ============ */
+#toggle-sidebar {
+  position: absolute; top: 50%; left: 0; transform: translateY(-50%);
+  z-index: 30; background: var(--srf); border: 1px solid var(--bdr);
+  border-left: none; border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  padding: 10px 5px; color: var(--txt2); transition: all var(--tx);
   display: none;
-  position: absolute; top: 12px; left: 12px; z-index: 35;
-  background: var(--srf); border: 1px solid var(--bdr); border-radius: var(--r-sm);
-  padding: 8px 10px; color: var(--txt); box-shadow: var(--sh);
 }
-
-/* ============================================================
-   TOOLTIP / INFO PANEL
-   ============================================================ */
+/* ============ TOOLTIP PANEL ============ */
 #info-panel {
   position: absolute; bottom: 36px; right: 14px; z-index: 25;
   background: var(--srf); border: 1px solid var(--bdr); border-radius: var(--r-lg);
-  padding: 14px 16px; min-width: 200px; max-width: 280px; box-shadow: var(--sh-lg);
+  padding: 14px 16px; min-width: 200px; box-shadow: var(--sh-lg);
   display: none;
-  animation: panelIn .22s cubic-bezier(.4,0,.2,1);
-}
-@keyframes panelIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 #info-panel.visible { display: block; }
-.ip-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; padding-right: 18px; }
+.ip-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
 .ip-type { font-size: 10px; color: var(--txt3); text-transform: capitalize; margin-bottom: 10px; letter-spacing: .05em; }
-.ip-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--txt2); margin-top: 5px; gap: 8px; }
-.ip-row strong { color: var(--txt); font-weight: 600; text-align: right; }
-.ip-close { position: absolute; top: 10px; right: 10px; font-size: 14px; color: var(--txt3); cursor: pointer; background: none; border: none; padding: 4px; border-radius: 4px; transition: background var(--tx), color var(--tx); }
-.ip-close:hover { background: var(--hov); color: var(--txt); }
+.ip-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--txt2); margin-top: 5px; }
+.ip-row strong { color: var(--txt); font-weight: 600; }
+.ip-close { position: absolute; top: 10px; right: 10px; font-size: 14px; color: var(--txt3); cursor: pointer; background: none; border: none; }
 .ip-badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 700; margin-top: 4px; }
 .ip-elig { background: rgba(52,211,153,.15); color: var(--grn); }
 .ip-inelig { background: rgba(248,113,113,.15); color: var(--red); }
-
-/* ============================================================
-   COMPLETION SCREEN
-   ============================================================ */
-#completion-overlay {
-  position: absolute; inset: 0; z-index: 50;
-  background: color-mix(in srgb, var(--bg) 78%, transparent);
-  backdrop-filter: blur(6px);
-  display: none; align-items: center; justify-content: center;
-  padding: 20px;
-}
-#completion-overlay.visible { display: flex; animation: fadeIn .3s ease; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-.completion-card {
-  background: var(--srf); border: 1px solid var(--bdr); border-radius: var(--r-xl);
-  padding: 28px; max-width: 460px; width: 100%; box-shadow: var(--sh-lg);
-  animation: cardIn .35s cubic-bezier(.34,1.56,.64,1);
-  max-height: 90vh; overflow-y: auto;
-}
-@keyframes cardIn {
-  from { opacity: 0; transform: scale(.92) translateY(12px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-.completion-icon {
-  width: 56px; height: 56px; border-radius: 50%;
-  background: rgba(52,211,153,.15); color: var(--grn);
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 16px;
-}
-.completion-title { font-size: 19px; font-weight: 700; text-align: center; margin-bottom: 4px; }
-.completion-sub { font-size: 12px; color: var(--txt3); text-align: center; margin-bottom: 22px; }
-.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px; }
-.summary-item { background: var(--srf2); border: 1px solid var(--bdr); border-radius: var(--r-md); padding: 12px; }
-.summary-val { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.summary-lbl { font-size: 10px; color: var(--txt3); text-transform: uppercase; letter-spacing: .05em; margin-top: 3px; }
-.completion-actions { display: flex; gap: 10px; }
-.completion-actions .c-btn { flex: 1; justify-content: center; padding: 10px; font-size: 13px; }
-
-/* ============================================================
-   LEAFLET OVERRIDES
-   ============================================================ */
+/* ============ LEAFLET OVERRIDES ============ */
 .leaflet-tooltip {
   background: var(--srf) !important;
   border: 1px solid var(--bdr) !important;
@@ -333,122 +177,64 @@ body {
 .dark .leaflet-control-attribution { background: rgba(10,15,26,.8) !important; color: #4b5563 !important; }
 .dark .leaflet-control-attribution a { color: #6b7280 !important; }
 body.dark .leaflet-bar a { background-color: var(--srf) !important; color: var(--txt) !important; border-color: var(--bdr) !important; }
-.leaflet-container { background: var(--bg) !important; outline: none; }
-.leaflet-control-zoom a:focus-visible { outline: 2px solid var(--acc) !important; outline-offset: -2px; }
-
-/* ============================================================
-   RESPONSIVE — TABLET
-   ============================================================ */
-@media (max-width: 900px) {
-  :root { --sidebar-w: 264px; }
-  .s-sect { padding: 11px 12px; }
-  #ctrl-bar { padding: 7px 10px; }
-  .spd-lbl { display: none; }
-}
-
-/* ============================================================
-   RESPONSIVE — MOBILE
-   ============================================================ */
-@media (max-width: 680px) {
-  :root { --sidebar-w: 86vw; }
-  #sidebar {
-    position: absolute; height: 100%; max-width: 320px;
-    transform: translateX(-100%);
-  }
-  #sidebar.open { transform: translateX(0); box-shadow: var(--sh-lg); }
-  #sidebar.collapsed { transform: translateX(-100%); }
-  #mobile-sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; }
-  #ctrl-bar { padding: 6px 8px; gap: 6px; }
-  .ctrl-left { gap: 5px; }
-  .dvdr { display: none; }
-  .drv-spd { font-size: 11px; }
-  .c-btn { padding: 6px 9px; font-size: 11px; }
-  .chip { display: none; }
-  #info-panel { left: 10px; right: 10px; bottom: 32px; max-width: none; }
-  .completion-card { padding: 20px; }
-  .summary-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
-  #map-foot { font-size: 9px; padding: 4px 10px; }
-  body.sidebar-scrim::before {
-    content: ''; position: absolute; inset: 0; z-index: 9;
-    background: rgba(0,0,0,.4); 
-  }
-}
-
-@media (max-width: 420px) {
-  .summary-grid { grid-template-columns: 1fr; }
-  .completion-actions { flex-direction: column; }
-}
+.leaflet-container { background: var(--bg) !important; }
 </style>
 </head>
 <body class="dark">
-
-<!-- LOADING SCREEN -->
-<div id="loading-screen" role="status" aria-live="polite">
-  <div class="loader-icon" aria-hidden="true">🛵</div>
-  <div class="loader-text">Loading Macro Rides</div>
-  <div class="loader-bar"><div class="loader-bar-fill"></div></div>
-</div>
-
 <div id="app">
   <!-- SIDEBAR -->
-  <nav id="sidebar" aria-label="Route statistics and pickup list">
+  <div id="sidebar">
     <div id="sidebar-header">
       <div class="logo-row">
-        <span class="logo-icon" aria-hidden="true">🛵</span>
+        <span class="logo-icon">🛵</span>
         <div>
           <div class="logo-brand">MACRO RIDES</div>
           <div class="logo-sub">Route Corridor Visualizer</div>
         </div>
       </div>
     </div>
-
     <!-- Progress -->
     <div class="s-sect">
-      <div class="s-title" id="progress-label">Route Progress</div>
-      <div class="prog-track" role="progressbar" aria-labelledby="progress-label" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="prog-track">
-        <div class="prog-fill" id="prog-fill" style="width:0%"></div>
-      </div>
-      <div class="prog-label" id="prog-label" aria-live="polite">0% · 0.00 / 0.00 km</div>
+      <div class="s-title">Route Progress</div>
+      <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+      <div class="prog-label" id="prog-label">0% · 0.00 / 0.00 km</div>
     </div>
-
     <!-- Stats -->
     <div class="s-sect">
       <div class="s-title">Live Statistics</div>
-      <div class="stats-grid" aria-live="polite">
+      <div class="stats-grid">
         <div class="stat-card">
-          <div class="stat-val" id="st-eligible" style="color:var(--acc)"><span id="st-eligible-num">0</span></div>
+          <div class="stat-val" id="st-eligible" style="color:var(--acc)">0</div>
           <div class="stat-lbl">Eligible Stops</div>
         </div>
         <div class="stat-card">
-          <div class="stat-val" id="st-coverage" style="color:var(--grn)"><span id="st-coverage-num">0</span><span class="stat-unit">%</span></div>
+          <div class="stat-val" id="st-coverage" style="color:var(--grn)">0<span class="stat-unit">%</span></div>
           <div class="stat-lbl">Coverage</div>
         </div>
         <div class="stat-card">
-          <div class="stat-val" id="st-riders" style="color:var(--pur)"><span id="st-riders-num">0</span></div>
+          <div class="stat-val" id="st-riders" style="color:var(--pur)">0</div>
           <div class="stat-lbl">Waiting Riders</div>
         </div>
         <div class="stat-card">
-          <div class="stat-val" id="st-area"><span id="st-area-num">0</span><span class="stat-unit"> km²</span></div>
+          <div class="stat-val" id="st-area">0<span class="stat-unit"> km²</span></div>
           <div class="stat-lbl">Corridor Area</div>
         </div>
       </div>
     </div>
-
     <!-- Legend -->
     <div class="s-sect">
       <div class="s-title">Map Legend</div>
       <div class="legend">
-        <div class="leg-row"><span class="leg-line" aria-hidden="true"></span>Traveled Route</div>
-        <div class="leg-row"><span class="leg-dot" style="background:rgba(56,189,248,.5);border:2px dashed var(--acc)" aria-hidden="true"></span>350m Corridor</div>
-        <div class="leg-row"><span class="leg-dot" style="background:var(--grn)" aria-hidden="true"></span>Eligible Pickup</div>
-        <div class="leg-row"><span class="leg-dot" style="background:var(--pickup-inactive)" aria-hidden="true"></span>Out of Corridor</div>
+        <div class="leg-row"><span class="leg-line"></span>Traveled Route</div>
+        <div class="leg-row"><span class="leg-dot" style="background:rgba(56,189,248,.5);border:2px dashed var(--acc)"></span>350m Corridor</div>
+        <div class="leg-row"><span class="leg-dot" style="background:var(--grn)"></span>Eligible Pickup</div>
+        <div class="leg-row"><span class="leg-dot" style="background:var(--txt3)"></span>Out of Corridor</div>
         <div class="leg-sep"></div>
-        <div class="leg-row"><span class="leg-dot" style="background:#22d3ee;opacity:.7" aria-hidden="true"></span>Operational Zone</div>
-        <div class="leg-row"><span class="leg-dot" style="background:#a78bfa;opacity:.7" aria-hidden="true"></span>Premium Zone</div>
-        <div class="leg-row"><span class="leg-dot" style="background:#f87171;opacity:.7" aria-hidden="true"></span>Restricted Zone</div>
+        <div class="leg-row"><span class="leg-dot" style="background:#22d3ee;opacity:.7"></span>Operational Zone</div>
+        <div class="leg-row"><span class="leg-dot" style="background:#a78bfa;opacity:.7"></span>Premium Zone</div>
+        <div class="leg-row"><span class="leg-dot" style="background:#f87171;opacity:.7"></span>Restricted Zone</div>
       </div>
     </div>
-
     <!-- Pickup List -->
     <div class="s-sect grow">
       <div class="s-title">
@@ -456,64 +242,50 @@ body.dark .leaflet-bar a { background-color: var(--srf) !important; color: var(-
         <span class="badge badge-g" id="eligible-count">0</span>
         <span style="margin-left:auto;opacity:.5;font-size:11px" id="inactive-count">0 inactive</span>
       </div>
-      <div id="pickup-list" role="list" aria-label="Eligible pickup points">
+      <div id="pickup-list">
         <div class="empty-msg">Press Play to begin the simulation</div>
       </div>
     </div>
-  </nav>
-
+  </div>
   <!-- MAP AREA -->
   <div id="map-area">
-    <button id="mobile-sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle sidebar" aria-expanded="true" aria-controls="sidebar">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-    </button>
-
     <!-- Controls -->
-    <div id="ctrl-bar" role="toolbar" aria-label="Simulation controls">
+    <div id="ctrl-bar">
       <div class="ctrl-left">
-        <button class="c-btn primary" id="btn-play" onclick="togglePlay()" aria-label="Play simulation">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><path d="M3 2l9 5-9 5z"/></svg>
-          <span>Play</span>
+        <button class="c-btn primary" id="btn-play" onclick="togglePlay()">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 2l9 5-9 5z"/></svg>
+          Play
         </button>
-        <button class="c-btn" onclick="resetSim()" aria-label="Reset simulation">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor" aria-hidden="true">
+        <button class="c-btn" onclick="resetSim()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor">
             <path d="M6.5 1A5.5 5.5 0 1 1 1 6.5H2.5A4 4 0 1 0 6.5 2.5V1z"/>
             <path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/>
           </svg>
-          <span>Reset</span>
+          Reset
         </button>
-        <div class="dvdr" aria-hidden="true"></div>
-        <div class="speed-wrap" role="group" aria-label="Playback speed">
+        <div class="dvdr"></div>
+        <div class="speed-wrap">
           <span class="spd-lbl">Speed</span>
-          <button class="spd-btn" data-speed="0.5" onclick="setSpeed(0.5)" aria-label="Half speed" aria-pressed="false">½×</button>
-          <button class="spd-btn active" data-speed="1" id="spd-1" onclick="setSpeed(1)" aria-label="Normal speed" aria-pressed="true">1×</button>
-          <button class="spd-btn" data-speed="2" onclick="setSpeed(2)" aria-label="Double speed" aria-pressed="false">2×</button>
-          <button class="spd-btn" data-speed="4" onclick="setSpeed(4)" aria-label="Quadruple speed" aria-pressed="false">4×</button>
+          <button class="spd-btn" onclick="setSpeed(0.5)">½×</button>
+          <button class="spd-btn active" id="spd-1" onclick="setSpeed(1)">1×</button>
+          <button class="spd-btn" onclick="setSpeed(2)">2×</button>
+          <button class="spd-btn" onclick="setSpeed(4)">4×</button>
         </div>
-        <div class="dvdr" aria-hidden="true"></div>
-        <div class="drv-spd" aria-live="polite">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
-          <span id="drv-speed">0</span> km/h
-        </div>
+        <div class="dvdr"></div>
+        <div class="drv-spd">⚡ <span id="drv-speed">0</span> km/h</div>
       </div>
       <div class="ctrl-right">
         <div class="chip chip-pur">H3 Res-9</div>
         <div class="chip chip-acc">350m buffer</div>
-        <button class="c-btn icon-only" onclick="toggleTheme()" title="Toggle theme" id="btn-theme" aria-label="Toggle dark and light theme">
-          <svg id="theme-icon-moon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-        </button>
-        <button class="c-btn icon-only" onclick="toggleSidebar()" title="Toggle sidebar" aria-label="Toggle sidebar" aria-expanded="true" aria-controls="sidebar">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-        </button>
+        <button class="c-btn icon-only" onclick="toggleTheme()" title="Toggle theme" id="btn-theme">🌙</button>
+        <button class="c-btn icon-only" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
       </div>
     </div>
-
     <!-- Map -->
-    <div id="map" role="application" aria-label="Interactive map showing driver route and pickup corridor" tabindex="0"></div>
-
+    <div id="map"></div>
     <!-- Info panel -->
-    <div id="info-panel" role="dialog" aria-label="Pickup point details" aria-hidden="true">
-      <button class="ip-close" onclick="closeInfoPanel()" aria-label="Close details panel">✕</button>
+    <div id="info-panel">
+      <button class="ip-close" onclick="closeInfoPanel()">✕</button>
       <div class="ip-title" id="ip-name">—</div>
       <div class="ip-type" id="ip-type">—</div>
       <div id="ip-badge" class="ip-badge ip-elig">✓ Eligible</div>
@@ -521,60 +293,13 @@ body.dark .leaflet-bar a { background-color: var(--srf) !important; color: var(-
       <div class="ip-row"><span>Distance from route</span><strong id="ip-dist">—</strong></div>
       <div class="ip-row"><span>H3 cell (Res-9)</span><strong id="ip-h3" style="font-family:var(--mono);font-size:10px">—</strong></div>
     </div>
-
-    <!-- Completion overlay -->
-    <div id="completion-overlay" role="dialog" aria-modal="true" aria-labelledby="completion-title">
-      <div class="completion-card">
-        <div class="completion-icon" aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-        </div>
-        <div class="completion-title" id="completion-title">Route Complete</div>
-        <div class="completion-sub">Koramangala → Indiranagar trip summary</div>
-        <div class="summary-grid">
-          <div class="summary-item">
-            <div class="summary-val" id="sum-distance" style="color:var(--acc)">0.00 km</div>
-            <div class="summary-lbl">Distance</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-val" id="sum-coverage" style="color:var(--grn)">0%</div>
-            <div class="summary-lbl">Coverage</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-val" id="sum-eligible" style="color:var(--pur)">0</div>
-            <div class="summary-lbl">Eligible Pickups</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-val" id="sum-riders">0</div>
-            <div class="summary-lbl">Riders Served</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-val" id="sum-avgspeed">0 km/h</div>
-            <div class="summary-lbl">Avg Speed</div>
-          </div>
-          <div class="summary-item">
-            <div class="summary-val" id="sum-duration">0s</div>
-            <div class="summary-lbl">Duration</div>
-          </div>
-        </div>
-        <div class="completion-actions">
-          <button class="c-btn primary" onclick="restartFromCompletion()" aria-label="Restart simulation">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="currentColor" aria-hidden="true"><path d="M6.5 1A5.5 5.5 0 1 1 1 6.5H2.5A4 4 0 1 0 6.5 2.5V1z"/><path d="M1 1v3.5h3.5" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>
-            Restart Simulation
-          </button>
-        </div>
-      </div>
-    </div>
-
     <div id="map-foot">Koramangala → Indiranagar · Bengaluru · H3 Res-9 Indexing · Turf.js 350m Buffer · <span id="h3-cell-count">0</span> H3 cells active</div>
   </div>
 </div>
-
 <script>
-'use strict';
-
-/* ================================================================
-   DATA — route, pickups, zones (unchanged from original project)
-   ================================================================ */
+// ============================================================
+// DATA
+// ============================================================
 const ROUTE = [
   [12.9352, 77.6245],[12.9371, 77.6268],[12.9389, 77.6290],
   [12.9412, 77.6315],[12.9435, 77.6341],[12.9461, 77.6360],
@@ -584,7 +309,6 @@ const ROUTE = [
   [12.9640, 77.6610],[12.9652, 77.6635],[12.9668, 77.6658],
   [12.9685, 77.6678],[12.9700, 77.6695]
 ];
-
 const PICKUPS = [
   {id:'p1',  name:'Forum Mall Koramangala', lat:12.9350, lng:77.6220, type:'landmark',    wait:4},
   {id:'p2',  name:'5th Block Bus Stop',     lat:12.9378, lng:77.6275, type:'bus_stop',    wait:2},
@@ -607,7 +331,6 @@ const PICKUPS = [
   {id:'p19', name:'Whitefield Main',        lat:12.9716, lng:77.7500, type:'bus_stop',    wait:4},
   {id:'p20', name:'Domlur Layout',          lat:12.9590, lng:77.6500, type:'residential', wait:1},
 ];
-
 const ZONES = [
   { name:'Koramangala Ops Zone', color:'#22d3ee', type:'operational', coords:[
     [12.9280,77.6180],[12.9480,77.6180],[12.9480,77.6400],[12.9280,77.6400]
@@ -622,223 +345,65 @@ const ZONES = [
     [12.9200,77.6600],[12.9350,77.6600],[12.9350,77.6800],[12.9200,77.6800]
   ]},
 ];
-
-/* SVG icon library — replaces emoji markers for crisp, theme-aware rendering */
-const TYPE_ICON_SVG = {
-  metro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="14" rx="2"/><path d="M4 11h16"/><path d="M8 19l-2 3M16 19l2 3"/><circle cx="8" cy="14" r="1"/><circle cx="16" cy="14" r="1"/></svg>',
-  bus_stop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="11" rx="2"/><path d="M3 11h18"/><path d="M7 17v2M17 17v2"/><circle cx="7.5" cy="14" r="1"/><circle cx="16.5" cy="14" r="1"/></svg>',
-  landmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-7.58 7-12a7 7 0 10-14 0c0 4.42 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>',
-  residential: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>',
-};
+const TYPE_ICON  = { metro:'🚇', bus_stop:'🚌', landmark:'📍', residential:'🏠' };
 const TYPE_COLOR = { metro:'#6366f1', bus_stop:'#f59e0b', landmark:'#8b5cf6', residential:'#10b981' };
-const H3_RES = 9;
+const H3_RES   = 9;
 const BUFFER_KM = 0.35;
-const TICK_MS = 750; // base ms per route point at 1x speed
-
-/* ================================================================
-   STATE
-   ================================================================ */
-const state = {
-  simIndex: 0,
-  isPlaying: false,
-  isComplete: false,
-  simSpeed: 1,
-  selectedPickup: null,
-  isDark: true,
-  sidebarOpen: true,
-  startTimestamp: null,     // performance.now() when sim started
-  elapsedBeforePause: 0,    // ms accumulated across pause/resume cycles
-  lastFrameTime: null,
-  accumulatedMs: 0,         // ms accumulated toward the next route-point tick
-  driverHeading: 0,         // persists across theme toggles
-  totalRidersServedPeak: 0, // tracks the max riders count seen (for completion summary)
-};
-
-// rAF handle so we can cancel cleanly
-let rafHandle = null;
-
-// Leaflet layers
+// ============================================================
+// STATE
+// ============================================================
+let simIndex = 0;
+let isPlaying = false;
+let isComplete = false;
+let simSpeed = 1;
+let simTimer = null;
+let selectedPickup = null;
+let isDark = true;
 let map, driverMarker, routeGhostLine, traveledLine, corridorLayer;
 const pickupCircles = {};
 const zoneLayers = [];
-
-// DOM node cache for the pickup list (avoids innerHTML rebuilds)
-const pickupListNodes = {}; // id -> { root, distEl, riderEl } (riders rarely change but kept for completeness)
-let lastRenderedEligibleIds = []; // ordered list from previous render, for diffing
-
-/* ================================================================
-   CORRIDOR CACHE
-   Avoids recomputing the full Turf.js buffer + H3 fill on every tick.
-   We cache the buffer/cell-set for the highest traveled index we've
-   already computed, and only recompute when the route has advanced.
-   Because corridor influence can change retroactively near the start
-   of a buffer (new buffer covers a superset of the route), we still
-   need the full polygon recomputed when the path grows — but the
-   "incremental" win here is that we (a) skip work entirely when the
-   route hasn't advanced between frames, and (b) reuse the previous
-   H3 fill when the new buffer's bounding cells haven't changed.
-   ================================================================ */
-const corridorCache = {
-  upToIndex: -1,
-  cells: new Set(),
-  buf: null,
-  boundsKey: null,
-};
-
-/* ================================================================
-   UTILITY / HELPER FUNCTIONS
-   ================================================================ */
-
-/** Safely get an element by id, throwing a clear console error if missing (no silent failures). */
-function $(id) {
-  const el = document.getElementById(id);
-  if (!el) {
-    console.error(`[MacroRides] Expected DOM element #${id} not found.`);
-  }
-  return el;
-}
-
-/** Clamp a number between min/max. */
-function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
-
-/** Format seconds as a human duration string, e.g. "1m 12s". */
-function formatDuration(totalSeconds) {
-  const s = Math.max(0, Math.round(totalSeconds));
-  const m = Math.floor(s / 60);
-  const rem = s % 60;
-  return m > 0 ? `${m}m ${rem}s` : `${rem}s`;
-}
-
-/** Build a bearing (degrees) from point a to point b using Turf. */
-function bearing(a, b) {
-  try {
-    return turf.bearing(turf.point([a[1], a[0]]), turf.point([b[1], b[0]]));
-  } catch (err) {
-    console.error('[MacroRides] bearing() failed:', err);
-    return 0;
-  }
-}
-
-/** Total route length in km (memoized — the full ROUTE never changes). */
-let _totalRouteLenKm = null;
-function getTotalRouteLength() {
-  if (_totalRouteLenKm === null) {
-    _totalRouteLenKm = calcRouteLen(ROUTE);
-  }
-  return _totalRouteLenKm;
-}
-
-function calcRouteLen(coords) {
-  if (coords.length < 2) return 0;
-  try {
-    const line = turf.lineString(coords.map(([lat, lng]) => [lng, lat]));
-    return turf.length(line, { units: 'kilometers' });
-  } catch (err) {
-    console.error('[MacroRides] calcRouteLen() failed:', err);
-    return 0;
-  }
-}
-
-/** Haversine-ish distance in km between two consecutive route points via Turf (used for realistic speed calc). */
-function distanceBetweenKm(a, b) {
-  try {
-    return turf.distance(turf.point([a[1], a[0]]), turf.point([b[1], b[0]]), { units: 'kilometers' });
-  } catch (err) {
-    console.error('[MacroRides] distanceBetweenKm() failed:', err);
-    return 0;
-  }
-}
-
-/* ================================================================
-   MAP INITIALIZATION
-   ================================================================ */
+// ============================================================
+// MAP INIT
+// ============================================================
 function initMap() {
-  try {
-    map = L.map('map', { zoomControl: false, attributionControl: true })
-      .setView([12.9530, 77.6430], 14);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
-    setTile();
-
-    // Zone polygons
-    ZONES.forEach(z => {
-      const layer = L.polygon(z.coords, {
-        color: z.color, fillColor: z.color,
-        fillOpacity: z.type === 'restricted' ? 0.14 : 0.1,
-        weight: 1.5,
-        dashArray: z.type === 'restricted' ? '6 4' : null,
-      }).addTo(map);
-      layer.bindTooltip(
-        `<strong>${escapeHtml(z.name)}</strong><br><span style="font-size:11px;opacity:.7;text-transform:capitalize">${escapeHtml(z.type)}</span>`,
-        { sticky: true }
-      );
-      zoneLayers.push(layer);
-    });
-
-    // Ghost (full) route
-    routeGhostLine = L.polyline(ROUTE, {
-      color: getCssVar('--ghost-route'), weight: 3, dashArray: '5 7', opacity: 0.6
+  map = L.map('map', { zoomControl: false, attributionControl: true }).setView([12.9530, 77.6430], 14);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  setTile();
+  ZONES.forEach(z => {
+    const layer = L.polygon(z.coords, {
+      color: z.color, fillColor: z.color,
+      fillOpacity: z.type === 'restricted' ? 0.14 : 0.1,
+      weight: 1.5,
+      dashArray: z.type === 'restricted' ? '6 4' : null,
     }).addTo(map);
-
-    // Traveled route (grows over time)
-    traveledLine = L.polyline([], { color: getCssVar('--acc'), weight: 4 }).addTo(map);
-
-    // Corridor buffer layer
-    corridorLayer = L.layerGroup().addTo(map);
-
-    // Pickup circle markers
-    PICKUPS.forEach(p => {
-      const c = L.circleMarker([p.lat, p.lng], circleOpts(p, false)).addTo(map);
-      c.bindTooltip(makeTooltip(p, false), { sticky: true });
-      c.on('click', () => openInfoPanel(p));
-      c.on('keypress', (e) => { if (e.originalEvent.key === 'Enter') openInfoPanel(p); });
-      pickupCircles[p.id] = c;
-    });
-
-    // Driver marker
-    driverMarker = L.marker(ROUTE[0], { icon: makeDriverIcon(0), zIndexOffset: 1000 }).addTo(map);
-
-    // Resize correctly whenever the map container itself changes size
-    const resizeObserver = new ResizeObserver(() => {
-      map.invalidateSize();
-    });
-    resizeObserver.observe(document.getElementById('map'));
-
-  } catch (err) {
-    console.error('[MacroRides] initMap() failed:', err);
-    showFatalError('Failed to initialize the map. Please refresh the page.');
-  }
+    layer.bindTooltip(`<strong>${z.name}</strong><br><span style="font-size:11px;opacity:.7;text-transform:capitalize">${z.type}</span>`, { sticky: true });
+    zoneLayers.push(layer);
+  });
+  routeGhostLine = L.polyline(ROUTE, {
+    color: '#334155', weight: 3, dashArray: '5 7', opacity: 0.6
+  }).addTo(map);
+  traveledLine = L.polyline([], { color: '#38bdf8', weight: 4 }).addTo(map);
+  corridorLayer = L.layerGroup().addTo(map);
+  PICKUPS.forEach(p => {
+    const c = L.circleMarker([p.lat, p.lng], circleOpts(p, false)).addTo(map);
+    c.bindTooltip(makeTooltip(p, false), { sticky: true });
+    c.on('click', () => openInfoPanel(p));
+    pickupCircles[p.id] = c;
+  });
+  driverMarker = L.marker(ROUTE[0], { icon: makeDriverIcon(0), zIndexOffset: 1000 }).addTo(map);
 }
-
-/** Read a CSS custom property's current resolved value (theme-aware colors for Leaflet, which can't use var()). */
-function getCssVar(name) {
-  return getComputedStyle(document.body).getPropertyValue(name).trim() || '#888';
-}
-
-/** Minimal HTML escaping for any user-influenced or external text inserted via innerHTML. */
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 function setTile() {
-  try {
-    if (map._tileLayer) map.removeLayer(map._tileLayer);
-    const url = state.isDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-    map._tileLayer = L.tileLayer(url, {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      maxZoom: 19,
-    }).addTo(map);
-  } catch (err) {
-    console.error('[MacroRides] setTile() failed:', err);
-  }
+  if (map._tileLayer) map.removeLayer(map._tileLayer);
+  const url = isDark
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  map._tileLayer = L.tileLayer(url, {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19,
+  }).addTo(map);
 }
-
-/** Driver marker icon — heading is preserved explicitly so theme toggles never reset direction. */
 function makeDriverIcon(heading) {
-  const bg = state.isDark ? '#0ea5e9' : '#0284c7';
+  const bg = isDark ? '#0ea5e9' : '#0284c7';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
     <circle cx="22" cy="22" r="20" fill="${bg}" fill-opacity="0.2"/>
     <circle cx="22" cy="22" r="13" fill="${bg}"/>
@@ -848,22 +413,20 @@ function makeDriverIcon(heading) {
   </svg>`;
   return L.divIcon({ html: svg, className: '', iconSize: [44,44], iconAnchor: [22,22] });
 }
-
 function circleOpts(p, eligible) {
-  const color = eligible ? (TYPE_COLOR[p.type] || '#10b981') : getCssVar('--pickup-inactive');
+  const color = eligible ? (TYPE_COLOR[p.type] || '#10b981') : (isDark ? '#4b5563' : '#9ca3af');
   return {
     radius: eligible ? 9 : 5,
-    color: eligible ? color : getCssVar('--pickup-inactive-ring'),
+    color: eligible ? color : (isDark ? '#374151' : '#d1d5db'),
     fillColor: color,
     fillOpacity: eligible ? 0.88 : 0.4,
     weight: eligible ? 2 : 1,
   };
 }
-
 function makeTooltip(p, eligible) {
   return `<div style="min-width:130px">
-    <div style="font-weight:700;font-size:12px;margin-bottom:2px">${escapeHtml(p.name)}</div>
-    <div style="font-size:11px;opacity:.7;text-transform:capitalize">${escapeHtml(p.type.replace('_',' '))}</div>
+    <div style="font-weight:700;font-size:12px;margin-bottom:2px">${p.name}</div>
+    <div style="font-size:11px;opacity:.7;text-transform:capitalize">${p.type.replace('_',' ')}</div>
     <div style="font-size:11px;margin-top:3px">
       ${eligible
         ? `<span style="color:#10b981;font-weight:600">✓ ${p.wait} rider${p.wait!==1?'s':''} waiting</span>`
@@ -872,737 +435,298 @@ function makeTooltip(p, eligible) {
     </div>
   </div>`;
 }
-
-/* ================================================================
-   THEME — fully refreshes every theme-dependent visual: pickup
-   markers, borders, tooltips, ghost route, driver icon (heading
-   preserved), and Leaflet tile layer.
-   ================================================================ */
-function toggleTheme() {
-  state.isDark = !state.isDark;
-  document.body.className = state.isDark ? 'dark' : 'light';
-
-  const moonPath = '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
-  const sunSvg = '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>';
-  const iconEl = $('theme-icon-moon');
-  if (iconEl) {
-    iconEl.innerHTML = state.isDark ? moonPath : sunSvg;
-  }
-
-  setTile();
-
-  // Driver icon must repaint with the *current* heading, not reset to 0
-  if (driverMarker) driverMarker.setIcon(makeDriverIcon(state.driverHeading));
-
-  // Ghost route recolors for theme contrast
-  if (routeGhostLine) routeGhostLine.setStyle({ color: getCssVar('--ghost-route') });
-
-  // Traveled line recolors to the accent color of the new theme
-  if (traveledLine) traveledLine.setStyle({ color: getCssVar('--acc') });
-
-  // Every pickup marker + tooltip refreshes to the new theme's inactive colors
-  PICKUPS.forEach(p => {
-    const c = pickupCircles[p.id];
-    if (!c) return;
-    const elig = !!p._elig;
-    c.setStyle(circleOpts(p, elig));
-    c.setTooltipContent(makeTooltip(p, elig));
+// ============================================================
+// H3 + TURF CORRIDOR  — FIX #1: correct H3 v4 API
+// ============================================================
+function calcCorridorCells(traveledCoords) {
+  if (traveledCoords.length < 2) return { cells: new Set(), buf: null };
+  const line = turf.lineString(traveledCoords.map(([lat,lng]) => [lng,lat]));
+  const buf  = turf.buffer(line, BUFFER_KM, { units: 'kilometers', steps: 20 });
+  if (!buf) return { cells: new Set(), buf: null };
+  const cells = new Set();
+  const polys = buf.geometry.type === 'MultiPolygon'
+    ? buf.geometry.coordinates
+    : [buf.geometry.coordinates];
+  polys.forEach(poly => {
+    try {
+      // FIX #1 — H3 v4 polygonToCells takes an array: [outerRing, ...holes]
+      const outerRing = poly[0].map(([lng, lat]) => [lat, lng]);
+      const holes     = poly.slice(1).map(hole => hole.map(([lng, lat]) => [lat, lng]));
+      const filled    = h3.polygonToCells([outerRing, ...holes], H3_RES);
+      filled.forEach(c => cells.add(c));
+    } catch(e) { console.warn('H3 error', e); }
   });
-
-  // Corridor polygon also uses the accent var — redraw with cached buffer (no recompute needed)
-  drawCorridor(corridorCache.buf);
-
-  // Info panel badge colors are CSS-var driven already; just ensure panel content is fresh
-  if (state.selectedPickup) {
-    const p = PICKUPS.find(x => x.id === state.selectedPickup.id);
-    if (p) openInfoPanel(p, { skipPan: true });
-  }
+  return { cells, buf };
 }
-
-/* ================================================================
-   CORRIDOR GENERATION (cached)
-   ================================================================ */
-function calcCorridorCells(traveledCoords, upToIndex) {
-  if (traveledCoords.length < 2) {
-    return { cells: new Set(), buf: null };
-  }
-
-  // If we've already computed this exact extent, reuse it — zero recompute.
-  if (corridorCache.upToIndex === upToIndex && corridorCache.buf) {
-    return { cells: corridorCache.cells, buf: corridorCache.buf };
-  }
-
-  try {
-    const line = turf.lineString(traveledCoords.map(([lat, lng]) => [lng, lat]));
-    const buf = turf.buffer(line, BUFFER_KM, { units: 'kilometers', steps: 16 });
-    if (!buf) return { cells: new Set(), buf: null };
-
-    const cells = new Set();
-    const polys = buf.geometry.type === 'MultiPolygon'
-      ? buf.geometry.coordinates
-      : [buf.geometry.coordinates];
-
-    polys.forEach(poly => {
-      try {
-        const outerRing = poly[0].map(([lng, lat]) => [lat, lng]);
-        const holes = poly.slice(1).map(hole => hole.map(([lng, lat]) => [lat, lng]));
-        const filled = h3.polygonToCells([outerRing, ...holes], H3_RES);
-        filled.forEach(c => cells.add(c));
-      } catch (innerErr) {
-        console.error('[MacroRides] H3 polygonToCells failed for a sub-polygon:', innerErr);
-      }
-    });
-
-    corridorCache.upToIndex = upToIndex;
-    corridorCache.cells = cells;
-    corridorCache.buf = buf;
-    return { cells, buf };
-
-  } catch (err) {
-    console.error('[MacroRides] calcCorridorCells() failed:', err);
-    return { cells: new Set(), buf: null };
-  }
-}
-
 function drawCorridor(buf) {
   corridorLayer.clearLayers();
   if (!buf) return;
-  try {
-    const polys = buf.geometry.type === 'MultiPolygon'
-      ? buf.geometry.coordinates
-      : [buf.geometry.coordinates];
-    const accent = getCssVar('--acc');
-    polys.forEach(poly => {
-      const latlngs = poly[0].map(([lng, lat]) => [lat, lng]);
-      L.polygon(latlngs, {
-        color: accent, fillColor: accent,
-        fillOpacity: 0.1, weight: 2, dashArray: '8 5'
-      }).addTo(corridorLayer);
-    });
-  } catch (err) {
-    console.error('[MacroRides] drawCorridor() failed:', err);
-  }
+  const polys = buf.geometry.type === 'MultiPolygon'
+    ? buf.geometry.coordinates
+    : [buf.geometry.coordinates];
+  polys.forEach(poly => {
+    const latlngs = poly[0].map(([lng,lat]) => [lat,lng]);
+    L.polygon(latlngs, {
+      color: '#38bdf8', fillColor: '#38bdf8',
+      fillOpacity: 0.1, weight: 2, dashArray: '8 5'
+    }).addTo(corridorLayer);
+  });
 }
-
 function calcArea(buf) {
   if (!buf) return 0;
-  try {
-    return turf.area(buf) / 1e6;
-  } catch (err) {
-    console.error('[MacroRides] calcArea() failed:', err);
-    return 0;
+  return turf.area(buf) / 1e6;
+}
+function calcRouteLen(coords) {
+  if (coords.length < 2) return 0;
+  const line = turf.lineString(coords.map(([lat,lng]) => [lng,lat]));
+  return turf.length(line, { units: 'kilometers' });
+}
+function bearing(a, b) {
+  return turf.bearing(turf.point([a[1],a[0]]), turf.point([b[1],b[0]]));
+}
+// ============================================================
+// HELPERS — FIX #2: safe stat setters (no firstChild crash)
+// ============================================================
+function setStatVal(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  // The first TEXT node holds the number; <span class="stat-unit"> follows it.
+  // Using childNodes[0] is safe whether or not the span exists.
+  if (el.childNodes.length > 0 && el.childNodes[0].nodeType === Node.TEXT_NODE) {
+    el.childNodes[0].textContent = value;
+  } else {
+    // Fallback: prepend a text node
+    el.insertBefore(document.createTextNode(value), el.firstChild);
   }
 }
-
+// ============================================================
+// SIM LOOP
+// ============================================================
+function tick() {
+  simIndex++;
+  if (simIndex >= ROUTE.length) {
+    isPlaying = false; isComplete = true;
+    clearInterval(simTimer); simTimer = null;
+    // FIX #3 — don't use outerHTML; just change className + innerHTML so
+    // getElementById('btn-play') still works in resetSim()
+    const bp = document.getElementById('btn-play');
+    bp.innerHTML  = '✓ Route Complete';
+    bp.className  = 'done-badge';
+    bp.onclick    = null;
+    return;
+  }
+  update(simIndex);
+}
+function update(idx) {
+  const traveled = ROUTE.slice(0, idx + 1);
+  const pos  = ROUTE[idx];
+  const prev = ROUTE[Math.max(0, idx - 1)];
+  const hdg  = bearing(prev, pos);
+  const spd  = Math.round(18 + Math.random() * 18);
+  driverMarker.setLatLng(pos);
+  driverMarker.setIcon(makeDriverIcon(hdg));
+  document.getElementById('drv-speed').textContent = spd;
+  traveledLine.setLatLngs(traveled);
+  const { cells, buf } = calcCorridorCells(traveled);
+  drawCorridor(buf);
+  let eligCount = 0, totalRiders = 0;
+  const eligItems = [];
+  PICKUPS.forEach(p => {
+    const h3idx = h3.latLngToCell(p.lat, p.lng, H3_RES);
+    const elig  = cells.has(h3idx);
+    p._h3   = h3idx;
+    p._elig = elig;
+    p._dist = calcDistFromRoute(p, traveled);
+    const c = pickupCircles[p.id];
+    c.setStyle(circleOpts(p, elig));
+    c.setRadius(elig ? 9 : 5);
+    c.setTooltipContent(makeTooltip(p, elig));
+    if (elig) { eligCount++; totalRiders += p.wait; eligItems.push(p); }
+  });
+  const totalLen    = calcRouteLen(ROUTE);
+  const traveledLen = calcRouteLen(traveled);
+  const pct      = Math.min(100, Math.round((traveledLen / totalLen) * 100));
+  const area     = calcArea(buf);
+  const coverage = PICKUPS.length > 0 ? Math.round((eligCount / PICKUPS.length) * 100) : 0;
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-label').textContent =
+    `${pct}% complete · ${traveledLen.toFixed(2)} / ${totalLen.toFixed(2)} km`;
+  // FIX #2 — use safe setter instead of .firstChild
+  setStatVal('st-eligible', eligCount);
+  setStatVal('st-coverage', coverage);
+  setStatVal('st-riders',   totalRiders);
+  setStatVal('st-area',     area.toFixed(2));
+  document.getElementById('eligible-count').textContent  = eligCount;
+  document.getElementById('inactive-count').textContent  = `${PICKUPS.length - eligCount} inactive`;
+  document.getElementById('h3-cell-count').textContent   = cells.size;
+  renderPickupList(eligItems);
+  updateInfoPanelIfOpen();
+  map.panTo(pos, { animate: true, duration: 0.5, noMoveStart: true });
+}
 function calcDistFromRoute(p, traveled) {
   if (traveled.length < 2) return null;
   try {
-    const line = turf.lineString(traveled.map(([lat, lng]) => [lng, lat]));
-    const pt = turf.point([p.lng, p.lat]);
+    const line = turf.lineString(traveled.map(([lat,lng]) => [lng,lat]));
+    const pt   = turf.point([p.lng, p.lat]);
     const near = turf.nearestPointOnLine(line, pt, { units: 'meters' });
     return near.properties.dist;
-  } catch (err) {
-    console.error('[MacroRides] calcDistFromRoute() failed:', err);
-    return null;
-  }
+  } catch(e) { return null; }
 }
-
-/* ================================================================
-   SMART CAMERA — only pans when the driver is about to leave the
-   visible viewport, instead of panTo() on every single tick.
-   ================================================================ */
-function maybeFollowDriver(pos) {
-  try {
-    const bounds = map.getBounds();
-    const point = L.latLng(pos[0], pos[1]);
-
-    // Shrink the bounds by ~22% on each side to pan *before* the driver
-    // reaches the very edge, giving a smoother, less jarring follow.
-    const shrunk = bounds.pad(-0.22);
-
-    if (!shrunk.contains(point)) {
-      map.panTo(point, { animate: true, duration: 0.5, noMoveStart: true });
-    }
-  } catch (err) {
-    console.error('[MacroRides] maybeFollowDriver() failed:', err);
-  }
-}
-
-/* ================================================================
-   SIMULATION LOOP — requestAnimationFrame driven, supports
-   0.5x / 1x / 2x / 4x by scaling how much sim-time advances per
-   real-time frame, rather than changing a setInterval delay.
-   ================================================================ */
-function rafLoop(now) {
-  if (!state.isPlaying) return;
-
-  if (state.lastFrameTime === null) {
-    state.lastFrameTime = now;
-  }
-  const realDeltaMs = now - state.lastFrameTime;
-  state.lastFrameTime = now;
-
-  // Scale elapsed time by playback speed so higher speeds advance the
-  // simulation faster without changing the smoothness of the rAF loop.
-  state.accumulatedMs += realDeltaMs * state.simSpeed;
-
-  let advanced = false;
-  while (state.accumulatedMs >= TICK_MS) {
-    state.accumulatedMs -= TICK_MS;
-    const finished = advanceTick();
-    advanced = true;
-    if (finished) {
-      rafHandle = null;
-      return; // stop loop — completion handler already triggered
-    }
-  }
-
-  if (advanced) {
-    // DOM updates happen once per frame even if multiple ticks advanced,
-    // preventing redundant layout thrash at high playback speeds.
-    renderFrame();
-  }
-
-  rafHandle = requestAnimationFrame(rafLoop);
-}
-
-/** Advances the route index by one. Returns true if the route just completed. */
-function advanceTick() {
-  state.simIndex++;
-  if (state.simIndex >= ROUTE.length) {
-    state.simIndex = ROUTE.length - 1;
-    completeSimulation();
-    return true;
-  }
-  return false;
-}
-
-function startRafLoop() {
-  if (rafHandle !== null) return;
-  state.lastFrameTime = null;
-  rafHandle = requestAnimationFrame(rafLoop);
-}
-
-function stopRafLoop() {
-  if (rafHandle !== null) {
-    cancelAnimationFrame(rafHandle);
-    rafHandle = null;
-  }
-}
-
-/* ================================================================
-   FRAME RENDER — all DOM/map mutations for the current simIndex.
-   Called at most once per animation frame regardless of how many
-   simulation ticks advanced within that frame.
-   ================================================================ */
-function renderFrame() {
-  const idx = state.simIndex;
-  const traveled = ROUTE.slice(0, idx + 1);
-  const pos = ROUTE[idx];
-  const prev = ROUTE[Math.max(0, idx - 1)];
-
-  // Heading + realistic speed from actual distance/time, not random jitter
-  const hdg = bearing(prev, pos);
-  state.driverHeading = hdg;
-
-  const segmentKm = distanceBetweenKm(prev, pos);
-  // Speed = distance / time-per-tick-in-hours. TICK_MS is fixed sim-time per
-  // route point regardless of playback speed, so the *displayed* speed
-  // reflects real-world pace rather than being skewed by simSpeed.
-  const tickHours = (TICK_MS / 1000) / 3600;
-  const rawSpeedKmh = tickHours > 0 ? segmentKm / tickHours : 0;
-  const displaySpeed = Math.round(clamp(rawSpeedKmh || 28, 15, 45));
-
-  driverMarker.setLatLng(pos);
-  driverMarker.setIcon(makeDriverIcon(hdg));
-  const speedEl = $('drv-speed');
-  if (speedEl) speedEl.textContent = displaySpeed;
-
-  traveledLine.setLatLngs(traveled);
-
-  const { cells, buf } = calcCorridorCells(traveled, idx);
-  drawCorridor(buf);
-
-  let eligCount = 0, totalRiders = 0;
-  const eligItems = [];
-
-  PICKUPS.forEach(p => {
-    const h3idx = h3.latLngToCell(p.lat, p.lng, H3_RES);
-    const elig = cells.has(h3idx);
-    p._h3 = h3idx;
-    p._elig = elig;
-    p._dist = calcDistFromRoute(p, traveled);
-
-    const c = pickupCircles[p.id];
-    c.setStyle(circleOpts(p, elig));
-    c.setTooltipContent(makeTooltip(p, elig));
-
-    if (elig) { eligCount++; totalRiders += p.wait; eligItems.push(p); }
-  });
-
-  state.totalRidersServedPeak = Math.max(state.totalRidersServedPeak, totalRiders);
-
-  const totalLen = getTotalRouteLength();
-  const traveledLen = calcRouteLen(traveled);
-  const pct = clamp(Math.round((traveledLen / totalLen) * 100), 0, 100);
-  const area = calcArea(buf);
-  const coverage = PICKUPS.length > 0 ? Math.round((eligCount / PICKUPS.length) * 100) : 0;
-
-  updateStatsDom({ pct, traveledLen, totalLen, eligCount, coverage, totalRiders, area, cellCount: cells.size });
-  renderPickupList(eligItems);
-  updateInfoPanelIfOpen();
-  maybeFollowDriver(pos);
-}
-
-/** Batches all stat-related DOM writes together for the frame. */
-function updateStatsDom({ pct, traveledLen, totalLen, eligCount, coverage, totalRiders, area, cellCount }) {
-  const progFill = $('prog-fill');
-  if (progFill) progFill.style.width = pct + '%';
-
-  const progTrack = $('prog-track');
-  if (progTrack) progTrack.setAttribute('aria-valuenow', String(pct));
-
-  const progLabel = $('prog-label');
-  if (progLabel) progLabel.textContent = `${pct}% complete · ${traveledLen.toFixed(2)} / ${totalLen.toFixed(2)} km`;
-
-  setText('st-eligible-num', eligCount);
-  setText('st-coverage-num', coverage);
-  setText('st-riders-num', totalRiders);
-  setText('st-area-num', area.toFixed(2));
-  setText('eligible-count', eligCount);
-  setText('inactive-count', `${PICKUPS.length - eligCount} inactive`);
-  setText('h3-cell-count', cellCount);
-}
-
-function setText(id, value) {
-  const el = $(id);
-  if (el) el.textContent = value;
-}
-
-/* ================================================================
-   PICKUP LIST — diff-based DOM updates instead of innerHTML rebuild.
-   Only adds/removes/reorders nodes that actually changed.
-   ================================================================ */
+// ============================================================
+// PICKUP LIST
+// ============================================================
 function renderPickupList(eligItems) {
-  const list = $('pickup-list');
-  if (!list) return;
-
+  const list = document.getElementById('pickup-list');
   if (eligItems.length === 0) {
-    if (lastRenderedEligibleIds.length !== 0 || list.querySelector('.empty-msg') === null) {
-      list.innerHTML = '<div class="empty-msg">Drive further to unlock pickup points</div>';
-      Object.keys(pickupListNodes).forEach(k => delete pickupListNodes[k]);
-      lastRenderedEligibleIds = [];
-    }
+    list.innerHTML = '<div class="empty-msg">Drive further to unlock pickup points</div>';
     return;
   }
-
-  // Remove the empty-state message if present
-  const emptyMsg = list.querySelector('.empty-msg');
-  if (emptyMsg) emptyMsg.remove();
-
-  const sorted = [...eligItems].sort((a, b) => b.wait - a.wait);
-  const newIds = sorted.map(p => p.id);
-
-  // Remove nodes for pickups that are no longer eligible
-  Object.keys(pickupListNodes).forEach(id => {
-    if (!newIds.includes(id)) {
-      pickupListNodes[id].root.remove();
-      delete pickupListNodes[id];
-    }
-  });
-
-  // Create or update nodes, and ensure correct order
-  let prevNode = null;
-  sorted.forEach(p => {
-    let entry = pickupListNodes[p.id];
-    if (!entry) {
-      entry = createPickupListItem(p);
-      pickupListNodes[p.id] = entry;
-    } else {
-      updatePickupListItem(entry, p);
-    }
-
-    // Reposition only if not already in the right place (avoids layout thrash)
-    const expectedPrevSibling = prevNode ? prevNode.nextSibling : list.firstChild;
-    if (entry.root !== expectedPrevSibling) {
-      if (prevNode) {
-        prevNode.after(entry.root);
-      } else {
-        list.prepend(entry.root);
-      }
-    }
-    prevNode = entry.root;
-  });
-
-  lastRenderedEligibleIds = newIds;
+  eligItems.sort((a,b) => b.wait - a.wait);
+  list.innerHTML = eligItems.map(p => {
+    const dist = p._dist != null ? Math.round(p._dist) + 'm' : '—';
+    const sel  = selectedPickup?.id === p.id ? ' sel' : '';
+    return `<div class="p-item${sel}" id="li-${p.id}" onclick="selectPickup('${p.id}')">
+      <span class="p-ico">${TYPE_ICON[p.type] || '📍'}</span>
+      <div class="p-info">
+        <div class="p-name">${p.name}</div>
+        <div class="p-meta">${dist} away<span class="p-tag">${p.type.replace('_',' ')}</span></div>
+      </div>
+      <div class="p-riders"><span class="r-cnt">${p.wait}</span><span class="r-lbl">riders</span></div>
+    </div>`;
+  }).join('');
 }
-
-function createPickupListItem(p) {
-  const root = document.createElement('div');
-  root.className = 'p-item';
-  root.id = `li-${p.id}`;
-  root.setAttribute('role', 'listitem');
-  root.setAttribute('tabindex', '0');
-  root.setAttribute('aria-label', `${p.name}, ${p.wait} riders waiting`);
-  root.onclick = () => selectPickup(p.id);
-  root.onkeypress = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPickup(p.id); } };
-
-  const icoWrap = document.createElement('span');
-  icoWrap.className = 'p-ico';
-  icoWrap.innerHTML = TYPE_ICON_SVG[p.type] || TYPE_ICON_SVG.landmark;
-  icoWrap.setAttribute('aria-hidden', 'true');
-
-  const info = document.createElement('div');
-  info.className = 'p-info';
-
-  const nameEl = document.createElement('div');
-  nameEl.className = 'p-name';
-  nameEl.textContent = p.name;
-
-  const metaEl = document.createElement('div');
-  metaEl.className = 'p-meta';
-
-  const distSpan = document.createElement('span');
-  distSpan.className = 'p-dist-text';
-
-  const tagSpan = document.createElement('span');
-  tagSpan.className = 'p-tag';
-  tagSpan.textContent = p.type.replace('_', ' ');
-
-  metaEl.appendChild(distSpan);
-  metaEl.appendChild(tagSpan);
-  info.appendChild(nameEl);
-  info.appendChild(metaEl);
-
-  const ridersWrap = document.createElement('div');
-  ridersWrap.className = 'p-riders';
-  const cnt = document.createElement('span');
-  cnt.className = 'r-cnt';
-  cnt.textContent = p.wait;
-  const lbl = document.createElement('span');
-  lbl.className = 'r-lbl';
-  lbl.textContent = 'riders';
-  ridersWrap.appendChild(cnt);
-  ridersWrap.appendChild(lbl);
-
-  root.appendChild(icoWrap);
-  root.appendChild(info);
-  root.appendChild(ridersWrap);
-
-  const list = $('pickup-list');
-  if (list) list.appendChild(root);
-
-  const entry = { root, distEl: distSpan };
-  updateSelectionClass(entry, p);
-  updateDistText(entry, p);
-  return entry;
-}
-
-function updatePickupListItem(entry, p) {
-  updateDistText(entry, p);
-  updateSelectionClass(entry, p);
-}
-
-function updateDistText(entry, p) {
-  const distStr = p._dist != null ? Math.round(p._dist) + 'm away' : '— away';
-  if (entry.distEl.textContent !== distStr) {
-    entry.distEl.textContent = distStr;
-  }
-}
-
-function updateSelectionClass(entry, p) {
-  const isSel = state.selectedPickup?.id === p.id;
-  entry.root.classList.toggle('sel', isSel);
-}
-
 function selectPickup(id) {
   const p = PICKUPS.find(x => x.id === id);
   if (!p) return;
-  state.selectedPickup = state.selectedPickup?.id === id ? null : p;
-
-  Object.entries(pickupListNodes).forEach(([pid, entry]) => {
-    entry.root.classList.toggle('sel', state.selectedPickup?.id === pid);
-  });
-
-  if (state.selectedPickup) openInfoPanel(state.selectedPickup);
+  selectedPickup = selectedPickup?.id === id ? null : p;
+  document.querySelectorAll('.p-item').forEach(el =>
+    el.classList.toggle('sel', el.id === `li-${selectedPickup?.id}`)
+  );
+  if (selectedPickup) openInfoPanel(selectedPickup);
   else closeInfoPanel();
 }
-
-/* ================================================================
-   INFO PANEL
-   ================================================================ */
-function openInfoPanel(p, opts = {}) {
-  state.selectedPickup = p;
-  setText('ip-name', p.name);
-  setText('ip-type', p.type.replace('_', ' '));
-  setText('ip-riders', p.wait);
-  setText('ip-h3', p._h3 ? p._h3.slice(0, 12) + '…' : '—');
-  setText('ip-dist', p._dist != null ? Math.round(p._dist) + ' m' : '—');
-
-  const badge = $('ip-badge');
-  if (badge) {
-    if (p._elig) {
-      badge.className = 'ip-badge ip-elig';
-      badge.textContent = '✓ Within Corridor';
-    } else {
-      badge.className = 'ip-badge ip-inelig';
-      badge.textContent = '✗ Outside Corridor';
-    }
-  }
-
-  const panel = $('info-panel');
-  if (panel) {
-    panel.classList.add('visible');
-    panel.setAttribute('aria-hidden', 'false');
-  }
-
-  if (!opts.skipPan) {
-    map.panTo([p.lat, p.lng], { animate: true, duration: 0.4 });
-  }
-}
-
-function closeInfoPanel() {
-  const panel = $('info-panel');
-  if (panel) {
-    panel.classList.remove('visible');
-    panel.setAttribute('aria-hidden', 'true');
-  }
-  state.selectedPickup = null;
-  Object.values(pickupListNodes).forEach(entry => entry.root.classList.remove('sel'));
-}
-
-function updateInfoPanelIfOpen() {
-  if (!state.selectedPickup) return;
-  const p = PICKUPS.find(x => x.id === state.selectedPickup.id);
-  if (p) openInfoPanel(p, { skipPan: true });
-}
-
-/* ================================================================
-   CONTROLS — Play / Pause / Reset / Speed
-   ================================================================ */
-function togglePlay() {
-  if (state.isComplete) return;
-
-  if (!state.isPlaying && state.simIndex === 0 && state.startTimestamp === null) {
-    state.startTimestamp = performance.now();
-  }
-
-  state.isPlaying = !state.isPlaying;
-  const btn = $('btn-play');
-
-  if (state.isPlaying) {
-    if (btn) {
-      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><rect x="2" y="2" width="4" height="10" rx="1"/><rect x="8" y="2" width="4" height="10" rx="1"/></svg><span>Pause</span>`;
-      btn.setAttribute('aria-label', 'Pause simulation');
-    }
-    startRafLoop();
+// ============================================================
+// INFO PANEL
+// ============================================================
+function openInfoPanel(p) {
+  selectedPickup = p;
+  document.getElementById('ip-name').textContent = p.name;
+  document.getElementById('ip-type').textContent = p.type.replace('_', ' ');
+  document.getElementById('ip-riders').textContent = p.wait;
+  document.getElementById('ip-h3').textContent = p._h3 ? p._h3.slice(0,12)+'…' : '—';
+  document.getElementById('ip-dist').textContent = p._dist != null ? Math.round(p._dist) + ' m' : '—';
+  const badge = document.getElementById('ip-badge');
+  if (p._elig) {
+    badge.className = 'ip-badge ip-elig';   badge.textContent = '✓ Within Corridor';
   } else {
-    if (btn) {
-      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><path d="M3 2l9 5-9 5z"/></svg><span>Play</span>`;
-      btn.setAttribute('aria-label', 'Resume simulation');
-    }
-    stopRafLoop();
+    badge.className = 'ip-badge ip-inelig'; badge.textContent = '✗ Outside Corridor';
+  }
+  document.getElementById('info-panel').classList.add('visible');
+  map.panTo([p.lat, p.lng], { animate: true, duration: 0.4 });
+}
+function closeInfoPanel() {
+  document.getElementById('info-panel').classList.remove('visible');
+  selectedPickup = null;
+  document.querySelectorAll('.p-item').forEach(el => el.classList.remove('sel'));
+}
+function updateInfoPanelIfOpen() {
+  if (!selectedPickup) return;
+  const p = PICKUPS.find(x => x.id === selectedPickup.id);
+  if (p) openInfoPanel(p);
+}
+// ============================================================
+// CONTROLS
+// ============================================================
+function togglePlay() {
+  if (isComplete) return;
+  isPlaying = !isPlaying;
+  const btn = document.getElementById('btn-play');
+  if (isPlaying) {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><rect x="2" y="2" width="4" height="10" rx="1"/><rect x="8" y="2" width="4" height="10" rx="1"/></svg> Pause`;
+    startTimer();
+  } else {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 2l9 5-9 5z"/></svg> Play`;
+    clearInterval(simTimer); simTimer = null;
   }
 }
-
-function completeSimulation() {
-  state.isPlaying = false;
-  state.isComplete = true;
-  stopRafLoop();
-
-  // Final frame render so stats reflect the very last route point
-  renderFrame();
-
-  const btn = $('btn-play');
-  if (btn) {
-    btn.outerHTML = '<span class="done-badge" id="btn-play"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>Route Complete</span>';
-  }
-
-  showCompletionScreen();
+function startTimer() {
+  if (simTimer) clearInterval(simTimer);
+  simTimer = setInterval(tick, 750 / simSpeed);
 }
-
-function showCompletionScreen() {
-  const totalLen = getTotalRouteLength();
-  const traveledLen = calcRouteLen(ROUTE.slice(0, state.simIndex + 1));
-  const eligCount = PICKUPS.filter(p => p._elig).length;
-  const coverage = PICKUPS.length > 0 ? Math.round((eligCount / PICKUPS.length) * 100) : 0;
-  const riders = state.totalRidersServedPeak;
-  const durationMs = performance.now() - (state.startTimestamp ?? performance.now());
-  const durationSec = (durationMs + state.elapsedBeforePause) / 1000;
-  const avgSpeed = durationSec > 0 ? Math.round((traveledLen / (durationSec / 3600))) : 0;
-
-  setText('sum-distance', traveledLen.toFixed(2) + ' km');
-  setText('sum-coverage', coverage + '%');
-  setText('sum-eligible', eligCount);
-  setText('sum-riders', riders);
-  setText('sum-avgspeed', clamp(avgSpeed || 28, 15, 45) + ' km/h');
-  setText('sum-duration', formatDuration(durationSec));
-
-  const overlay = $('completion-overlay');
-  if (overlay) overlay.classList.add('visible');
-}
-
-function hideCompletionScreen() {
-  const overlay = $('completion-overlay');
-  if (overlay) overlay.classList.remove('visible');
-}
-
-function restartFromCompletion() {
-  hideCompletionScreen();
-  resetSim();
-}
-
 function resetSim() {
-  stopRafLoop();
-  state.isPlaying = false;
-  state.isComplete = false;
-  state.simIndex = 0;
-  state.accumulatedMs = 0;
-  state.lastFrameTime = null;
-  state.startTimestamp = null;
-  state.elapsedBeforePause = 0;
-  state.totalRidersServedPeak = 0;
-  state.driverHeading = 0;
-
-  // Reset corridor cache so the next play starts clean
-  corridorCache.upToIndex = -1;
-  corridorCache.cells = new Set();
-  corridorCache.buf = null;
-
-  hideCompletionScreen();
-
-  // Restore the Play button (handles both the "done badge" and a normal button state)
-  const btnContainer = document.getElementById('btn-play');
-  if (btnContainer) {
-    const fresh = document.createElement('button');
-    fresh.className = 'c-btn primary';
-    fresh.id = 'btn-play';
-    fresh.setAttribute('aria-label', 'Play simulation');
-    fresh.onclick = togglePlay;
-    fresh.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><path d="M3 2l9 5-9 5z"/></svg><span>Play</span>`;
-    btnContainer.replaceWith(fresh);
+  clearInterval(simTimer); simTimer = null;
+  isPlaying = false; isComplete = false; simIndex = 0;
+  // FIX #4 — restore button properly (works even after "Route Complete" state)
+  const btn = document.getElementById('btn-play');
+  if (btn) {
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M3 2l9 5-9 5z"/></svg> Play`;
+    btn.className = 'c-btn primary';
+    btn.onclick   = togglePlay;
   }
-
   driverMarker.setLatLng(ROUTE[0]);
   driverMarker.setIcon(makeDriverIcon(0));
   traveledLine.setLatLngs([]);
   corridorLayer.clearLayers();
-
   PICKUPS.forEach(p => {
     p._elig = false; p._dist = null; p._h3 = null;
-    const c = pickupCircles[p.id];
-    c.setStyle(circleOpts(p, false));
-    c.setTooltipContent(makeTooltip(p, false));
+    pickupCircles[p.id].setStyle(circleOpts(p, false));
+    pickupCircles[p.id].setRadius(5);
   });
-
-  const progFill = $('prog-fill');
-  if (progFill) progFill.style.width = '0%';
-  const progTrack = $('prog-track');
-  if (progTrack) progTrack.setAttribute('aria-valuenow', '0');
-  setText('prog-label', `0% · 0.00 / ${getTotalRouteLength().toFixed(2)} km`);
-
-  setText('st-eligible-num', '0');
-  setText('st-coverage-num', '0');
-  setText('st-riders-num', '0');
-  setText('st-area-num', '0');
-  setText('eligible-count', '0');
-  setText('inactive-count', `${PICKUPS.length} inactive`);
-  setText('h3-cell-count', '0');
-  setText('drv-speed', '0');
-
-  const list = $('pickup-list');
-  if (list) list.innerHTML = '<div class="empty-msg">Press Play to begin the simulation</div>';
-  Object.keys(pickupListNodes).forEach(k => delete pickupListNodes[k]);
-  lastRenderedEligibleIds = [];
-
+  document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('prog-label').textContent = '0% · 0.00 / 0.00 km';
+  // FIX #2 — safe setters in reset too
+  setStatVal('st-eligible', '0');
+  setStatVal('st-coverage', '0');
+  setStatVal('st-riders',   '0');
+  setStatVal('st-area',     '0');
+  document.getElementById('eligible-count').textContent = '0';
+  document.getElementById('inactive-count').textContent = `${PICKUPS.length} inactive`;
+  document.getElementById('h3-cell-count').textContent  = '0';
+  document.getElementById('drv-speed').textContent      = '0';
+  document.getElementById('pickup-list').innerHTML =
+    '<div class="empty-msg">Press Play to begin the simulation</div>';
   closeInfoPanel();
   map.setView([12.9530, 77.6430], 14, { animate: true });
 }
-
 function setSpeed(s) {
-  state.simSpeed = s;
+  simSpeed = s;
+  // FIX #5 — compare by data-speed attribute to avoid NaN from ½× text
   document.querySelectorAll('.spd-btn').forEach(b => {
-    const bSpeed = parseFloat(b.dataset.speed);
-    const isActive = bSpeed === s;
-    b.classList.toggle('active', isActive);
-    b.setAttribute('aria-pressed', String(isActive));
+    const bVal = b.getAttribute('data-speed');
+    b.classList.toggle('active', bVal !== null ? parseFloat(bVal) === s : false);
   });
+  if (isPlaying) startTimer();
 }
-
-/* ================================================================
-   SIDEBAR TOGGLE — responsive-aware (drawer on mobile, push on desktop)
-   ================================================================ */
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.className = isDark ? 'dark' : 'light';
+  document.getElementById('btn-theme').textContent = isDark ? '🌙' : '☀️';
+  setTile();
+  driverMarker.setIcon(makeDriverIcon(0));
+  routeGhostLine.setStyle({ color: isDark ? '#334155' : '#cbd5e1' });
+}
+let sidebarOpen = true;
 function toggleSidebar() {
-  state.sidebarOpen = !state.sidebarOpen;
-  const sidebar = $('sidebar');
-  const isMobile = window.matchMedia('(max-width: 680px)').matches;
-
-  if (isMobile) {
-    sidebar.classList.toggle('open', state.sidebarOpen);
-    sidebar.classList.toggle('collapsed', !state.sidebarOpen);
-    document.body.classList.toggle('sidebar-scrim', state.sidebarOpen);
-  } else {
-    sidebar.classList.toggle('collapsed', !state.sidebarOpen);
-  }
-
-  document.querySelectorAll('[aria-controls="sidebar"]').forEach(btn => {
-    btn.setAttribute('aria-expanded', String(state.sidebarOpen));
+  sidebarOpen = !sidebarOpen;
+  document.getElementById('sidebar').classList.toggle('collapsed', !sidebarOpen);
+  setTimeout(() => map.invalidateSize(), 310);
+}
+// ============================================================
+// BOOT
+// ============================================================
+window.addEventListener('load', () => {
+  // FIX #5 — add data-speed attributes to speed buttons for reliable comparison
+  document.querySelectorAll('.spd-btn').forEach(b => {
+    const txt = b.textContent.trim();
+    if (txt === '½×') b.setAttribute('data-speed', '0.5');
+    else if (txt === '1×') b.setAttribute('data-speed', '1');
+    else if (txt === '2×') b.setAttribute('data-speed', '2');
+    else if (txt === '4×') b.setAttribute('data-speed', '4');
   });
-
-  // Let the CSS transition finish before telling Leaflet to recalculate size
-  setTimeout(() => { if (map) map.invalidateSize(); }, 360);
-}
-
-/* ================================================================
-   ERROR SURFACE — fatal init errors get a visible (not silent) message
-   ================================================================ */
-function showFatalError(message) {
-  const loading = $('loading-screen');
-  if (loading) {
-    loading.innerHTML = `<div style="text-align:center;padding:0 24px;max-width:360px">
-      <div style="font-size:32px;margin-bottom:12px">⚠️</div>
-      <div style="font-weight:700;margin-bottom:6px">Something went wrong</div>
-      <div style="font-size:13px;color:var(--txt3)">${escapeHtml(message)}</div>
-    </div>`;
-    loading.classList.remove('hidden');
-  }
-}
-
-/* ================================================================
-   BOOT
-   ================================================================ */
-function boot() {
-  try {
-    initMap();
-    setText('prog-label', `0% · 0.00 / ${getTotalRouteLength().toFixed(2)} km`);
-    setText('inactive-count', `${PICKUPS.length} inactive`);
-  } catch (err) {
-    console.error('[MacroRides] boot() failed:', err);
-    showFatalError('The application failed to start. Please refresh the page.');
-  } finally {
-    // Hide loading screen whether boot succeeded or hit a recoverable error
-    setTimeout(() => {
-      const loading = $('loading-screen');
-      if (loading && !loading.innerHTML.includes('Something went wrong')) {
-        loading.classList.add('hidden');
-      } else if (loading) {
-        // Still allow dismissing a fatal-error loading screen after a delay
-        setTimeout(() => loading.classList.add('hidden'), 4000);
-      }
-    }, 450);
-  }
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', boot);
-} else {
-  boot();
-}
-
-// Keep Leaflet's internal size correct on every viewport change (resize, rotate, etc.)
-window.addEventListener('resize', () => {
-  if (map) map.invalidateSize();
+  initMap();
+  const totalLen = calcRouteLen(ROUTE);
+  document.getElementById('prog-label').textContent = `0% · 0.00 / ${totalLen.toFixed(2)} km`;
 });
 </script>
 </body>
-</html>
+</html> 
